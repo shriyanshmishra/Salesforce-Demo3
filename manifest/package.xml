@@ -3,15 +3,5 @@
     <types>
         <members>Anonymization_Sobject__c</members>
         <name>CustomObject</name>
-    </types>
-    <types>
-        <members>Anonymization_Sobject__c.Active__c</members>
-        <members>Anonymization_Sobject__c.Batch_Size__c</members>
-        <members>Anonymization_Sobject__c.Comments__c</members>
-        <members>Anonymization_Sobject__c.Order_By__c</members>
-        <members>Anonymization_Sobject__c.Where_Clause__c</members>
-        <members>Anonymization_Sobject__c.sObject_Name__c</members>
-        <name>CustomField</name>
-    </types>
-    <version>58.0</version>
+    <version>61.0</version>
 </Package>
