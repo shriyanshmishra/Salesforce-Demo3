@@ -1,14 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Package xmlns="http://soap.sforce.com/2006/04/metadata">
   <types>
-    <members>force-app/main/default/objects/Anonymization_Sobject__c/fields/Active__c.field</members>
-    <members>force-app/main/default/objects/Anonymization_Sobject__c/fields/Batch_Size__c.field</members>
-    <members>force-app/main/default/objects/Anonymization_Sobject__c/fields/Comments__c.field</members>
-    <members>force-app/main/default/objects/Anonymization_Sobject__c/fields/Order_By__c.field</members>
-    <members>force-app/main/default/objects/Anonymization_Sobject__c/fields/Where_Clause__c.field</members>
-    <members>force-app/main/default/objects/Anonymization_Sobject__c/fields/sObject_Name__c.field</members>
+    <members>Anonymization_Job__c</members>
+    <members>Anonymization_Sobject__c</members>
     <name>CustomObject</name>
+  </types>
+  <types>
+    <members>Anonymization_Job__c.Status__c</members>
+    <members>Anonymization_Job__c.sObject_Name__c</members>
+    <members>Anonymization_Sobject__c.Active__c</members>
+    <members>Anonymization_Sobject__c.Batch_Size__c</members>
+    <members>Anonymization_Sobject__c.Comments__c</members>
+    <members>Anonymization_Sobject__c.Order_By__c</members>
+    <members>Anonymization_Sobject__c.Where_Clause__c</members>
+    <members>Anonymization_Sobject__c.sObject_Name__c</members>
+    <name>CustomField</name>
   </types>
   <version>58.0</version>
 </Package>
-

@@ -41,40 +41,60 @@ const membersByType = {};
 changedFiles.forEach(filePath => {
   const normalizedPath = filePath.replace(/\\/g, '/');
 
-  // Extract folder
   const match = normalizedPath.match(/force-app\/main\/default\/([^/]+)\/(.+)/);
   if (!match) return;
 
   const [_, folder, relativeFile] = match;
-
   const metadataType = metadataTypeMap[folder];
   if (!metadataType) return;
 
-  let memberName;
+  // Special handling for CustomObject + CustomField
+  if (folder === 'objects') {
+    // normalizedPath: force-app/main/default/objects/Anonymization_Sobject__c/...
+    const parts = normalizedPath.split('/');
+    const objName = parts[4]; // Anonymization_Sobject__c
 
-  // Handle bundle-based (folder-based) components like LWC or Aura
+    // Object file
+    if (relativeFile.endsWith('.object-meta.xml')) {
+      membersByType['CustomObject'] ??= new Set();
+      membersByType['CustomObject'].add(objName);
+    }
+
+    // Field files: fields/Active__c.field-meta.xml -> Anonymization_Sobject__c.Active__c
+    if (relativeFile.startsWith('fields/') && relativeFile.endsWith('.field-meta.xml')) {
+      const fieldName = relativeFile
+        .replace('fields/', '')
+        .replace('.field-meta.xml', ''); // Active__c
+      const fullFieldName = `${objName}.${fieldName}`;
+      membersByType['CustomField'] ??= new Set();
+      membersByType['CustomField'].add(fullFieldName);
+    }
+
+    // Done for objects; skip generic handling
+    return;
+  }
+
+  // Existing generic handling for other metadata types
+  let memberName;
   if (metadataType === 'LightningComponentBundle' || metadataType === 'AuraComponent') {
     const parts = normalizedPath.split('/');
-    memberName = parts[4]; // e.g., 'myLwcComponent'
+    memberName = parts[4];
   } else if (metadataType === 'FlexiPage' && relativeFile.endsWith('-meta.xml')) {
     memberName = relativeFile.replace('.flexipage-meta.xml', '');
   } else {
-    // Strip known extensions
     memberName = relativeFile
       .replace(/-meta\.xml$/, '')
       .replace(/\.(cls|trigger|page|component|app|layout|object|xml)$/i, '');
   }
 
-  if (!membersByType[metadataType]) {
-    membersByType[metadataType] = new Set();
-  }
+  membersByType[metadataType] ??= new Set();
   membersByType[metadataType].add(memberName);
 
-  // Optional logging
   if (logFlag === '--log-members-only') {
     console.log(`📦 ${metadataType}: ${memberName}`);
   }
 });
+
 
 // Convert to XML structure
 const typesXml = Object.entries(membersByType)
