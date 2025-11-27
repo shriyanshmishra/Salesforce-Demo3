@@ -33,7 +33,7 @@ jobs:
           echo "$SERVER_KEY" > server.key
           chmod 600 server.key
 
-      - name: Authenticate Dev Hub (used to create scratch org)
+      - name: Authenticate Dev Hub
         env:
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
           SF_USERNAME: ${{ secrets.SF_USERNAME }}          # Dev Hub user
@@ -47,34 +47,10 @@ jobs:
             --instance-url "${SF_INSTANCE_URL:-https://login.salesforce.com}"
           sf org display --target-org myqaorg
 
-      - name: Ensure scratch org exists (fixed alias)
+      - name: Use existing scratch org (fixed alias)
         run: |
-          set +e
-          sf org display --target-org fixed-scratch > /dev/null 2>&1
-          STATUS=$?
-          set -e
-          if [ $STATUS -ne 0 ]; then
-            echo "Scratch org 'fixed-scratch' not found. Creating a new one."
-            sf org create scratch \
-              -f config/project-scratch-def.json \
-              -a fixed-scratch \
-              --set-default \
-              --duration-days 7 \
-              --wait 10 \
-              --target-dev-hub myqaorg
-            echo "Generating password for new scratch org user..."
-            sf org generate password --target-org fixed-scratch
-          else
-            echo "Reusing existing scratch org 'fixed-scratch'."
-          fi
-
-      - name: Output scratch org credentials
-        run: |
-          echo "::group::Scratch Org Credentials"
+          echo "Using existing scratch org 'fixed-scratch'."
           sf org display --target-org fixed-scratch --verbose
-          echo "::endgroup::"
-          echo "To login via browser:"
-          sf org open --target-org fixed-scratch --url-only
 
       - name: Calculate changed files (git diff)
         run: |
