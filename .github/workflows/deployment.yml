@@ -36,8 +36,8 @@ jobs:
       - name: Authenticate Dev Hub (used to create scratch org)
         env:
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
-          SF_USERNAME: ${{ secrets.SF_USERNAME }}              # Dev Hub user
-          SF_INSTANCE_URL: ${{ secrets.SF_INSTANCE_URL }}      # e.g. https://login.salesforce.com
+          SF_USERNAME: ${{ secrets.SF_USERNAME }}          # Dev Hub user
+          SF_INSTANCE_URL: ${{ secrets.SF_INSTANCE_URL }}  # e.g. https://login.salesforce.com
         run: |
           sf org login jwt \
             --client-id "$CLIENT_ID" \
@@ -62,6 +62,8 @@ jobs:
               --duration-days 7 \
               --wait 10 \
               --target-dev-hub myqaorg
+            echo "Generating password for new scratch org user..."
+            sf org generate password --target-org fixed-scratch
           else
             echo "Reusing existing scratch org 'fixed-scratch'."
           fi
@@ -70,7 +72,6 @@ jobs:
         run: |
           echo "::group::Scratch Org Credentials"
           sf org display --target-org fixed-scratch --verbose
-          sf org generate password --target-org fixed-scratch
           echo "::endgroup::"
           echo "To login via browser:"
           sf org open --target-org fixed-scratch --url-only
@@ -95,16 +96,15 @@ jobs:
       - name: Validate Deployment (check-only)
         id: validate
         run: |
-          if grep -q "<types>" manifest/package.xml; then
-            sf project deploy validate \
-              --manifest manifest/package.xml \
-              --target-org fixed-scratch \
-              --test-level RunLocalTests \
-              --wait 40
-          else
+          if ! grep -q "<types>" manifest/package.xml; then
             echo "No Salesforce metadata changes detected. Skipping validation."
             exit 0
           fi
+          sf project deploy validate \
+            --manifest manifest/package.xml \
+            --target-org fixed-scratch \
+            --test-level RunLocalTests \
+            --wait 40
 
       - name: Deploy to Scratch Org (if validation succeeded)
         if: steps.validate.outcome == 'success'
