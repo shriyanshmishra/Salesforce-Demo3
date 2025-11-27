@@ -1,0 +1,116 @@
+name: Feature Branch Scratch Org CI
+
+on:
+  push:
+    branches:
+      - 'feature'
+  pull_request:
+    branches:
+      - 'feature/**'
+
+jobs:
+  scratch-org-validate-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install Salesforce CLI
+        run: npm install @salesforce/cli@latest --global
+
+      - name: Write JWT key to file (Dev Hub)
+        env:
+          SERVER_KEY: ${{ secrets.SERVER_KEY }}
+        run: |
+          echo "$SERVER_KEY" > server.key
+          chmod 600 server.key
+
+      - name: Authenticate Dev Hub (used to create scratch org)
+        env:
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          SF_USERNAME: ${{ secrets.SF_USERNAME }}              # Dev Hub user
+          SF_INSTANCE_URL: ${{ secrets.SF_INSTANCE_URL }}      # e.g. https://login.salesforce.com
+        run: |
+          sf org login jwt \
+            --client-id "$CLIENT_ID" \
+            --jwt-key-file ./server.key \
+            --username "$SF_USERNAME" \
+            --alias myqaorg \
+            --instance-url "${SF_INSTANCE_URL:-https://login.salesforce.com}"
+          sf org display --target-org myqaorg
+
+      - name: Ensure scratch org exists (fixed alias)
+        run: |
+          set +e
+          sf org display --target-org fixed-scratch > /dev/null 2>&1
+          STATUS=$?
+          set -e
+          if [ $STATUS -ne 0 ]; then
+            echo "Scratch org 'fixed-scratch' not found. Creating a new one."
+            sf org create scratch \
+              -f config/project-scratch-def.json \
+              -a fixed-scratch \
+              --set-default \
+              --duration-days 7 \
+              --wait 10 \
+              --target-dev-hub myqaorg
+          else
+            echo "Reusing existing scratch org 'fixed-scratch'."
+          fi
+
+      - name: Output scratch org credentials
+        run: |
+          echo "::group::Scratch Org Credentials"
+          sf org display --target-org fixed-scratch --verbose
+          sf org generate password --target-org fixed-scratch
+          echo "::endgroup::"
+          echo "To login via browser:"
+          sf org open --target-org fixed-scratch --url-only
+
+      - name: Calculate changed files (git diff)
+        run: |
+          git fetch origin main
+          git diff --name-only origin/main...HEAD > changed_files.txt
+          grep '^force-app/main/default/' changed_files.txt > filtered_changed_files.txt || true
+
+      - name: Create manifest/package.xml
+        run: |
+          mkdir -p manifest
+          node scripts/generate-package-xml.js filtered_changed_files.txt manifest/package.xml
+
+      - name: Show package.xml content
+        run: |
+          echo "===== Generated package.xml content ====="
+          cat manifest/package.xml || echo "package.xml is empty"
+          echo "========================================="
+
+      - name: Validate Deployment (check-only)
+        id: validate
+        run: |
+          if grep -q "<types>" manifest/package.xml; then
+            sf project deploy validate \
+              --manifest manifest/package.xml \
+              --target-org fixed-scratch \
+              --test-level RunLocalTests \
+              --wait 40
+          else
+            echo "No Salesforce metadata changes detected. Skipping validation."
+            exit 0
+          fi
+
+      - name: Deploy to Scratch Org (if validation succeeded)
+        if: steps.validate.outcome == 'success'
+        run: |
+          sf project deploy start \
+            --manifest manifest/package.xml \
+            --target-org fixed-scratch \
+            --test-level RunLocalTests \
+            --wait 40
