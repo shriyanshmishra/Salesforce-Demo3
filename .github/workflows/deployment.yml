@@ -26,33 +26,13 @@ jobs:
       - name: Install Salesforce CLI
         run: npm install @salesforce/cli@latest --global
 
-      - name: Write JWT key to file (Dev Hub)
+      - name: Import auth for existing scratch org
         env:
-          SERVER_KEY: ${{ secrets.SERVER_KEY }}
+          SCRATCH_SFDX_AUTH_URL: ${{ secrets.SCRATCH_SFDX_AUTH_URL }}
         run: |
-          echo "$SERVER_KEY" > server.key
-          chmod 600 server.key
-
-      - name: Authenticate Dev Hub
-        env:
-          CLIENT_ID: ${{ secrets.CLIENT_ID }}
-          SF_USERNAME: ${{ secrets.SF_USERNAME }}          # Dev Hub user
-          SF_INSTANCE_URL: ${{ secrets.SF_INSTANCE_URL }}  # e.g. https://login.salesforce.com
-        run: |
-          sf org login jwt \
-            --client-id "$CLIENT_ID" \
-            --jwt-key-file ./server.key \
-            --username "$SF_USERNAME" \
-            --alias myqaorg \
-            --instance-url "${SF_INSTANCE_URL:-https://login.salesforce.com}"
-          sf org display --target-org myqaorg
-
-      - name: Use existing scratch org
-        env:
-          SCRATCH_USERNAME: ${{ secrets.SCRATCH_USERNAME }}
-        run: |
-          echo "Using existing scratch org '$SCRATCH_USERNAME'."
-          sf org display --target-org "$SCRATCH_USERNAME" --verbose
+          echo "$SCRATCH_SFDX_AUTH_URL" > scratch-auth.txt
+          sf org login sfdx-url --sfdx-url-file scratch-auth.txt --alias fixed-scratch
+          sf org display --target-org fixed-scratch --verbose
 
       - name: Calculate changed files (git diff)
         run: |
@@ -73,8 +53,6 @@ jobs:
 
       - name: Validate Deployment (check-only)
         id: validate
-        env:
-          SCRATCH_USERNAME: ${{ secrets.SCRATCH_USERNAME }}
         run: |
           if ! grep -q "<types>" manifest/package.xml; then
             echo "No Salesforce metadata changes detected. Skipping validation."
@@ -82,17 +60,15 @@ jobs:
           fi
           sf project deploy validate \
             --manifest manifest/package.xml \
-            --target-org "$SCRATCH_USERNAME" \
+            --target-org fixed-scratch \
             --test-level RunLocalTests \
             --wait 40
 
       - name: Deploy to Scratch Org (if validation succeeded)
         if: steps.validate.outcome == 'success'
-        env:
-          SCRATCH_USERNAME: ${{ secrets.SCRATCH_USERNAME }}
         run: |
           sf project deploy start \
             --manifest manifest/package.xml \
-            --target-org "$SCRATCH_USERNAME" \
+            --target-org fixed-scratch \
             --test-level RunLocalTests \
             --wait 40
