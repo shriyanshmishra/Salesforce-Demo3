@@ -71,4 +71,5 @@ jobs:
             --manifest manifest/package.xml \
             --target-org fixed-scratch \
             --test-level RunLocalTests \
-            --wait 40
+            --wait 40 \
+            --ignore-conflicts
